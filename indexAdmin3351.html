@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Privado</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root { --primary: #2563eb; --success: #16a34a; --danger: #dc2626; --warning: #ea580c; --dark: #1f2937; --light: #f3f4f6; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; background-color: var(--light); color: var(--dark); }
+        .navbar { background-color: var(--dark); color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+        .main-container { max-width: 600px; margin: 0 auto; padding: 15px; }
+        .panel { background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .hidden { display: none !important; }
+        .btn { padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+        .tab-btn { flex: 1; padding: 10px; background: #e5e7eb; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; }
+        .tab-btn.active { background: var(--dark); color: white; }
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; margin-bottom: 4px; font-weight: 500; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+        th, td { border: 1px solid #e5e7eb; padding: 6px; text-align: left; }
+        th { background: #f3f4f6; }
+        .thumbnail-evidence { width: 45px; height: 45px; object-fit: cover; border-radius: 4px; }
+        .user-list-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <span>⚙️ Consola de Administración [ADMIN]</span>
+        <button class="btn btn-danger" style="padding:5px 10px; font-size:12px;" onclick="cerrarPanel()">Bloquear</button>
+    </nav>
+
+    <div class="main-container" id="login-container" style="text-align:center; margin-top:50px;">
+        <div class="panel">
+            <h3>Módulo Privado Protegido</h3>
+            <p>Ingresá la clave de acceso:</p>
+            <input type="password" id="admin-pass-field" style="padding:10px; width:80%; text-align:center; font-size:16px; border-radius:6px; border:1px solid #ccc;" onkeydown="if(event.key==='Enter') verificarPassword()"><br><br>
+            <button class="btn btn-primary" style="width:84%;" onclick="verificarPassword()">Desbloquear Consola</button>
+        </div>
+    </div>
+
+    <div class="main-container hidden" id="admin-content">
+        <div class="tabs">
+            <button class="tab-btn active" id="t-usuarios" onclick="switchTab('usuarios')">👥 Alumnos</button>
+            <button class="tab-btn" id="t-planilla" onclick="switchTab('planilla')">📊 Planilla</button>
+            <button class="tab-btn" id="t-hardware" onclick="switchTab('hardware')">⚙️ Cámara</button>
+        </div>
+
+        <div id="tab-content-usuarios" class="tab-panel">
+            <div class="panel">
+                <h4 id="form-title" style="margin:0 0 10px 0;">Registrar Nuevo Alumno</h4>
+                <form id="user-form" onsubmit="return false;">
+                    <input type="hidden" id="edit-index" value="-1">
+                    <div class="form-group"><label>DNI / Código QR</label><input type="text" id="user-id" required></div>
+                    <div class="form-group"><label>Nombre</label><input type="text" id="user-firstname" required></div>
+                    <div class="form-group"><label>Apellido</label><input type="text" id="user-lastname" required></div>
+                    <div class="form-group"><label>Foto Base (Opcional)</label><input type="file" accept="image/*" onchange="convertirBase64()"><input type="hidden" id="user-photo-base64"></div>
+                    <button class="btn btn-primary" style="width:100%" onclick="guardarUsuario()">Guardar Registro</button>
+                </form>
+            </div>
+            <div class="panel">
+                <h4>Base de Datos Local</h4>
+                <div id="registered-list"></div>
+            </div>
+        </div>
+
+        <div id="tab-content-planilla" class="tab-panel hidden">
+            <div class="panel">
+                <button class="btn btn-success" style="width:100%; margin-bottom:10px;" onclick="exportarExcel()">📥 Descargar Planilla a Excel</button>
+                <button class="btn btn-danger" style="width:100%; font-size:11px; padding:5px;" onclick="limpiarPlanilla()">Limpiar Historial Histórico</button>
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead><tr><th>Fecha/Hora</th><th>DNI</th><th>Alumno/Alerta</th><th>Movimiento</th><th>Foto Auditoría</th></tr></thead>
+                        <tbody id="planilla-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-content-hardware" class="tab-panel hidden">
+            <div class="panel">
+                <h3>Ajustes de Lente del Tótem</h3>
+                <div class="form-group">
+                    <label>Lente Predeterminado para Alumnos</label>
+                    <select id="camera-select-hardware" onchange="cambiarLenteLocal(this.value)">
+                        <option value="user">Cámara Frontal (Modo Espejo)</option>
+                        <option value="environment">Cámara Trasera (Lente Principal)</option>
+                    </select>
+                </div>
+                <p style="font-size:12px; color:#6b7280;">El cambio se aplicará de manera automática en la pantalla de los alumnos la próxima vez que inicien la cámara.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CLAVE = "JTap2026";
+        let baseUsuarios = JSON.parse(localStorage.getItem('qr_usuarios')) || [];
+        let historialAsistencia = JSON.parse(localStorage.getItem('qr_asistencia')) || [];
+
+        function verificarPassword() {
+            const pass = document.getElementById('admin-pass-field').value;
+            if(pass === CLAVE) {
+                document.getElementById('login-container').classList.add('hidden');
+                document.getElementById('admin-content').classList.remove('hidden');
+                document.getElementById('camera-select-hardware').value = localStorage.getItem('cfg_lente_camara') || "environment";
+                renderUsuarios();
+            } else {
+                historialAsistencia.unshift({
+                    fecha: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString(),
+                    id: "999999", nombre: "INTRUSO - ACCESO INTERFAZ ADMIN", movimiento: "ERROR CLAVE", evidencia: ""
+                });
+                localStorage.setItem('qr_asistencia', JSON.stringify(historialAsistencia));
+                alert("Clave incorrecta. Intento registrado.");
+                document.getElementById('admin-pass-field').value = "";
+            }
+        }
+
+        function cerrarPanel() { location.reload(); }
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`tab-content-${name}`).classList.remove('hidden');
+            document.getElementById(`t-${name}`).classList.add('active');
+            if(name === 'usuarios') renderUsuarios();
+            if(name === 'planilla') renderPlanilla();
+        }
+
+        function cambiarLenteLocal(val) { localStorage.setItem('cfg_lente_camara', val); }
+
+        function convertirBase64() {
+            const file = document.querySelector('input[type=file]').files;
+            const reader = new FileReader();
+            reader.onloadend = () => document.getElementById('user-photo-base64').value = reader.result;
+            if(file[0]) reader.readAsDataURL(file[0]);
+        }
+
+        function guardarUsuario() {
+            const id = document.getElementById('user-id').value.trim();
+            const fn = document.getElementById('user-firstname').value.trim();
+            const ln = document.getElementById('user-lastname').value.trim();
+            const ph = document.getElementById('user-photo-base64').value;
+            const idx = parseInt(document.getElementById('edit-index').value);
+
+            if(!id || !fn || !ln) return;
+            if(idx === -1 && baseUsuarios.some(u => u.id === id)) { alert("Ya existe."); return; }
+
+            if(idx > -1) { baseUsuarios[idx]={id, firstname:fn, lastname:ln, photo: ph||baseUsuarios[idx].photo}; }
+            else { baseUsuarios.push({id, firstname:fn, lastname:ln, photo:ph}); }
+
+            localStorage.setItem('qr_usuarios', JSON.stringify(baseUsuarios));
+            document.getElementById('user-form').reset();
+            document.getElementById('edit-index').value = "-1";
+            document.getElementById('form-title').innerText = "Registrar Nuevo Alumno";
+            renderUsuarios();
+        }
+
+        function renderUsuarios() {
+            const container = document.getElementById('registered-list'); container.innerHTML = '';
+            baseUsuarios.forEach((user, idx) => {
+                const div = document.createElement('div'); div.className = 'user-list-item';
+                div.innerHTML = `<div><strong>\${user.lastname}, \${user.firstname}</strong> (DNI: \${user.id})</div>
+                                 <div><button class="btn btn-primary" style="padding:4px 8px; font-size:11px;" onclick="cargarEdicion(\${idx})">✏️</button>
+                                 <button class="btn btn-danger" style="padding:4px 8px; font-size:11px;" onclick="eliminarU(\${idx})">🗑️</button></div>`;
+                container.appendChild(div);
+            });
+        }
+
+        function cargarEdicion(idx) {
+            const u = baseUsuarios[idx];
+            document.getElementById('user-id').value = u.id;
+            document.getElementById('user-firstname').value = u.firstname;
+            document.getElementById('user-lastname').value = u.lastname;
+            document.getElementById('edit-index').value = idx;
+            document.getElementById('form-title').innerText = "Modificar Alumno";
+        }
+
+        function eliminarU(idx) { if(confirm("¿Eliminar?")) { baseUsuarios.splice(idx,1); localStorage.setItem('qr_usuarios', JSON.stringify(baseUsuarios)); renderUsuarios(); } }
+
+        function renderPlanilla() {
+            const tbody = document.getElementById('planilla-body'); tbody.innerHTML = '';
+            historialAsistencia.forEach(reg => {
+                let color = 'color:#16a34a; font-weight:bold;';
+                if(reg.movimiento==='SALIDA') color = 'color:#dc2626; font-weight:bold;';
+                if(reg.movimiento==='ERROR CLAVE') color = 'color:var(--warning); font-weight:bold;';
+                const img = reg.evidencia ? `<img src="\${reg.evidencia}" class="thumbnail-evidence">` : 'Sin foto';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>\${reg.fecha}</td><td>\${reg.id}</td><td>\${reg.nombre}</td><td style="\${color}">\${reg.movimiento}</td><td>\${img}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function limpiarPlanilla() { if(confirm("¿Borrar todo?")) { historialAsistencia=[]; localStorage.setItem('qr_asistencia', JSON.stringify(historialAsistencia)); renderPlanilla(); } }
+
+        function exportarExcel() {
+            if(historialAsistencia.length === 0) return;
+            const data = historialAsistencia.map(r => ({ "Fecha/Hora": r.fecha, "DNI": r.id, "Alumno/Alerta": r.nombre, "Movimiento": r.movimiento, "Foto Auditoría (Base64)": r.evidencia }));
+            const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Asistencias");
+            XLSX.writeFile(wb, `Planilla_Asistencias.xlsx`);
+        }
+    </script>
+</body>
+</html>

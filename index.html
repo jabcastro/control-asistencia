@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tótem de Asistencia - Alumnos</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root { --primary: #2563eb; --success: #16a34a; --danger: #dc2626; --dark: #1f2937; --light: #f3f4f6; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; background-color: var(--light); color: var(--dark); user-select: none; }
+        .navbar { background-color: var(--dark); color: white; padding: 15px; text-align: center; font-weight: bold; }
+        .main-container { max-width: 500px; margin: 0 auto; padding: 15px; box-sizing: border-box; }
+        .panel { background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .hidden { display: none !important; }
+        #reader { width: 100%; max-width: 260px; margin: 0 auto; background: #000; border-radius: 8px; overflow: hidden; }
+        .btn { padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; text-align: center; display: block; width: 100%; margin-bottom: 10px; box-sizing: border-box; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .welcome-box { text-align: center; padding: 20px 10px; }
+        .user-card { text-align: center; padding: 15px; border: 2px dashed #ccc; border-radius: 8px; min-height: 180px; }
+        .avatar-container { display: flex; justify-content: center; margin-bottom: 15px; }
+        .user-avatar { width: 110px; height: 110px; border-radius: 8px; object-fit: cover; background: #e5e7eb; border: 2px solid #ccc; }
+        .action-buttons { display: flex; gap: 15px; margin-top: 15px; }
+        .action-buttons .btn { flex: 1; font-size: 18px; padding: 16px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 4px; font-weight: 500; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar"><strong id="nav-title">Tótem Educativo - Alumnos</strong></nav>
+
+    <div class="main-container">
+        <!-- PANTALLA INICIO -->
+        <div id="screen-inicio" class="screen">
+            <div class="panel welcome-box">
+                <h2>Control de Acceso</h2>
+                <p style="color:#6b7280; margin-bottom:25px;">Seleccioná tu método de ingreso:</p>
+                <button class="btn btn-primary" style="padding:15px; font-size:16px;" onclick="showScreen('escaneo')">📸 Registrarse con QR</button>
+                <button class="btn btn-success" style="padding:15px; font-size:16px;" onclick="showScreen('manual')">⌨️ Registrarse con DNI</button>
+            </div>
+        </div>
+        
+        <!-- PANTALLA QR -->
+        <div id="screen-escaneo" class="screen hidden">
+            <div class="panel">
+                <div id="reader"></div>
+                <button class="btn btn-secondary" style="margin-top:10px;" onclick="regresarAlInicio()">🏠 Cancelar y Volver</button>
+            </div>
+            <div class="panel">
+                <div id="user-card" class="user-card">
+                    <p style="color: #6b7280;" id="scan-prompt">Presentá tu tarjeta QR frente a la cámara...</p>
+                    <div id="user-data" class="hidden">
+                        <span style="color:var(--primary); font-weight:bold;">¡ALUMNO DETECTADO!</span>
+                        <div class="avatar-container" style="margin-top:10px;"><img id="view-avatar" class="user-avatar" src="" alt="Foto"></div>
+                        <h2 id="view-name" style="margin: 5px 0;">-</h2>
+                        <p id="view-id" style="margin: 0 0 15px 0; color: #6b7280; font-weight: bold;">DNI: -</p>
+                        <div class="action-buttons">
+                            <button class="btn btn-success" onclick="intentarFichaje('ENTRADA')">ENTRADA</button>
+                            <button class="btn btn-danger" onclick="intentarFichaje('SALIDA')">SALIDA</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANTALLA MANUAL -->
+        <div id="screen-manual" class="screen hidden">
+            <div class="panel">
+                <h3>Ingreso Manual por DNI</h3>
+                <div class="form-group">
+                    <label>Ingresá tu Número de DNI</label>
+                    <input type="number" id="manual-dni-input" placeholder="Ej: 34555666" onkeydown="if(event.key === 'Enter') buscarDniManual()">
+                </div>
+                <button class="btn btn-primary" onclick="buscarDniManual()">Buscar y Validar Identidad</button>
+                <button class="btn btn-secondary" onclick="regresarAlInicio()">🏠 Volver al Inicio</button>
+            </div>
+            <div class="panel hidden" id="manual-profile-box">
+                <div class="user-card">
+                    <div class="avatar-container"><img id="manual-view-avatar" class="user-avatar" src="" alt="Foto"></div>
+                    <h3 id="manual-view-name">-</h3>
+                    <p id="manual-view-id" style="font-weight:bold; color:#6b7280; margin-bottom:15px;">DNI: -</p>
+                    <div class="action-buttons">
+                        <button class="btn btn-success" onclick="intentarFichaje('ENTRADA')">Confirmar ENTRADA</button>
+                        <button class="btn btn-danger" onclick="intentarFichaje('SALIDA')">Confirmar SALIDA</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas-capture" style="display:none;"></canvas>
+
+    <script>
+        let baseUsuarios = JSON.parse(localStorage.getItem('qr_usuarios')) || [];
+        let historialAsistencia = JSON.parse(localStorage.getItem('qr_asistencia')) || [];
+        let html5QrcodeScanner = null, currentUserDetected = null, audioCtx = null;
+
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        function emitirSonido(t) {
+            initAudio(); if (!audioCtx) return;
+            const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination);
+            if (t==='ENTRADA') { o.frequency.setValueAtTime(880, audioCtx.currentTime); g.gain.setValueAtTime(0.2, audioCtx.currentTime); o.start(); o.stop(audioCtx.currentTime+0.15); }
+            else if (t==='SALIDA') { o.frequency.setValueAtTime(587, audioCtx.currentTime); o.start(); o.stop(audioCtx.currentTime+0.25); }
+            else { o.type='sawtooth'; o.frequency.setValueAtTime(160, audioCtx.currentTime); g.gain.setValueAtTime(0.3, audioCtx.currentTime); o.start(); o.stop(audioCtx.currentTime+0.4); }
+        }
+
+        function showScreen(name) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+            document.getElementById(`screen-${name}`).classList.remove('hidden');
+            if (name === 'escaneo') { resetearInterfaz(); autoIniciarCamara(); } else { stopCamera(); }
+        }
+
+        function regresarAlInicio() { stopCamera(); showScreen('inicio'); }
+        function resetearInterfaz() {
+            currentUserDetected = null;
+            document.getElementById('scan-prompt').classList.remove('hidden');
+            document.getElementById('user-data').classList.add('hidden');
+            document.getElementById('manual-profile-box').classList.add('hidden');
+            document.getElementById('manual-dni-input').value = "";
+        }
+
+        function autoIniciarCamara() {
+            const lente = localStorage.getItem('cfg_lente_camara') || "environment";
+            if (html5QrcodeScanner && html5QrcodeScanner.isScanning) return;
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start({ facingMode: lente }, { fps: 12, qrbox: 220 }, onQrRead).catch(()=>console.log("Cámara diferida"));
+        }
+
+        function stopCamera() { if (html5QrcodeScanner) { html5QrcodeScanner.stop().then(()=>html5QrcodeScanner=null).catch(()=>{}); } }
+
+        function onQrRead(text) {
+            if (currentUserDetected) return;
+            const alu = baseUsuarios.find(u => u.id === text.trim());
+            if (alu) {
+                currentUserDetected = alu; emitirSonido('ENTRADA');
+                document.getElementById('scan-prompt').classList.add('hidden');
+                document.getElementById('user-data').classList.remove('hidden');
+                document.getElementById('view-name').innerText = `${alu.lastname}, ${alu.firstname}`;
+                document.getElementById('view-id').innerText = `DNI: ${alu.id}`;
+                document.getElementById('view-avatar').src = alu.photo || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ccc"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+            } else { emitirSonido('ERROR'); alert("QR No registrado."); }
+        }
+
+        function buscarDniManual() {
+            const dni = document.getElementById('manual-dni-input').value.trim();
+            const alu = baseUsuarios.find(u => u.id === dni);
+            if(alu) {
+                currentUserDetected = alu;
+                document.getElementById('manual-profile-box').classList.remove('hidden');
+                document.getElementById('manual-view-name').innerText = `${alu.lastname}, ${alu.firstname}`;
+                document.getElementById('manual-view-id').innerText = `DNI: ${alu.id}`;
+                document.getElementById('manual-view-avatar').src = alu.photo || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ccc"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+            } else { emitirSonido('ERROR'); alert("DNI no encontrado."); resetearInterfaz(); }
+        }
+
+        function intentarFichaje(tipoMovimiento) {
+            if (!currentUserDetected) return;
+
+            const hoyStr = new Date().toLocaleDateString();
+            const marcasDeHoy = historialAsistencia.filter(reg => reg.id === currentUserDetected.id && reg.fecha.startsWith(hoyStr));
+            const ultimaMarcaDeHoy = marcasDeHoy.length > 0 ? marcasDeHoy[0].movimiento : null;
+
+            if (tipoMovimiento === 'ENTRADA') {
+                if (ultimaMarcaDeHoy === 'ENTRADA') {
+                    emitirSonido('ERROR');
+                    alert(`Acción Denegada: Ya registraste una ENTRADA hoy y no has marcado salida.`);
+                    regresarAlInicio();
+                    return;
+                }
+            } else if (tipoMovimiento === 'SALIDA') {
+                if (!ultimaMarcaDeHoy || marcasDeHoy.filter(m => m.movimiento === 'ENTRADA').length === 0) {
+                    emitirSonido('ERROR');
+                    alert(`Acción Denegada: No podés marcar SALIDA si no tenés una entrada registrada el día de hoy.`);
+                    regresarAlInicio();
+                    return;
+                }
+                if (ultimaMarcaDeHoy === 'SALIDA') {
+                    emitirSonido('ERROR');
+                    alert(`Acción Denegada: Tu última marca de hoy ya fue una SALIDA.`);
+                    regresarAlInicio();
+                    return;
+                }
+            }
+
+            ejecutarGuardadoFichaje(tipoMovimiento);
+        }
+
+        function ejecutarGuardadoFichaje(tipo) {
+            let fotoEvidencia = "";
+            const video = document.querySelector("#reader video");
+            if (video) {
+                const canvas = document.getElementById("canvas-capture"); canvas.width = 240; canvas.height = 240;
+                const ctx = canvas.getContext("2d");
+                if((localStorage.getItem('cfg_lente_camara') || "environment") === 'user') { ctx.translate(240, 0); ctx.scale(-1, 1); }
+                ctx.drawImage(video, 0, 0, 240, 240); fotoEvidencia = canvas.toDataURL("image/jpeg", 0.75);
+            }
+
+            const registro = {
+                fecha: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString(),
+                id: currentUserDetected.id,
+                nombre: `${currentUserDetected.lastname}, ${currentUserDetected.firstname}`,
+                movimiento: tipo,
+                evidencia: fotoEvidencia
+            };
+
+            historialAsistencia.unshift(registro);
+            localStorage.setItem('qr_asistencia', JSON.stringify(historialAsistencia));
+            emitirSonido(tipo);
+            alert(`¡${tipo} Guardada!`);
+            regresarAlInicio();
+        }
+    </script>
+</body>
+</html>
