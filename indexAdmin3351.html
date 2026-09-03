@@ -121,23 +121,36 @@
         let baseUsuarios = JSON.parse(localStorage.getItem('qr_usuarios')) || [];
         let historialAsistencia = JSON.parse(localStorage.getItem('qr_asistencia')) || [];
 
-        function verificarPassword() {
-            const pass = document.getElementById('admin-pass-field').value;
-            if(pass === CLAVE) {
-                document.getElementById('login-container').classList.add('hidden');
-                document.getElementById('admin-content').classList.remove('hidden');
-                document.getElementById('camera-select-hardware').value = localStorage.getItem('cfg_lente_camara') || "environment";
-                renderUsuarios();
-            } else {
-                historialAsistencia.unshift({
-                    fecha: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString(),
-                    id: "999999", nombre: "INTRUSO - ACCESO INTERFAZ ADMIN", movimiento: "ERROR CLAVE", evidencia: ""
-                });
-                localStorage.setItem('qr_asistencia', JSON.stringify(historialAsistencia));
-                alert("Clave incorrecta. Intento registrado en la planilla.");
-                document.getElementById('admin-pass-field').value = "";
-            }
-        }
+     // --- VERIFICACIÓN BLINDADA CON HASH SHA-256 ---
+async function verificarPassword() {
+    const pass = document.getElementById('admin-pass-field').value;
+    
+    // Convertimos el texto ingresado a un Hash SHA-256 de forma nativa en el navegador
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pass);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    // Este es el Hash irreversible exclusivo de tu contraseña secreta
+    const HASH_CORRECTO = "e2c349eb4037dae61cc247be99876251b68fb098d5c4b5748f2aa2fdf40fb877";
+
+    if(hashHex === HASH_CORRECTO) {
+        document.getElementById('login-container').classList.add('hidden');
+        document.getElementById('admin-content').classList.remove('hidden');
+        document.getElementById('camera-select-hardware').value = localStorage.getItem('cfg_lente_camara') || "environment";
+        renderUsuarios();
+    } else {
+        // Caza-intrusos sigue reportando el sabotaje
+        historialAsistencia.unshift({
+            fecha: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString(),
+            id: "999999", nombre: "INTRUSO - ACCESO INTERFAZ ADMIN", movimiento: "ERROR CLAVE", evidencia: ""
+        });
+        localStorage.setItem('qr_asistencia', JSON.stringify(historialAsistencia));
+        alert("Clave incorrecta. Intento registrado en la planilla.");
+        document.getElementById('admin-pass-field').value = "";
+    }
+}
 
         function cerrarPanel() { location.reload(); }
 
